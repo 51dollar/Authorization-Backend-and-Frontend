@@ -58,3 +58,5 @@ bld/
 *.svclog
 *.scc
 *.user
+*.db-shm
+*.db-wal
