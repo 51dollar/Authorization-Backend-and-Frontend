@@ -60,3 +60,4 @@ bld/
 *.user
 *.db-shm
 *.db-wal
+*.db
