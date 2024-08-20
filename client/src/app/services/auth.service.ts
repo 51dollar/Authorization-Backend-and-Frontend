@@ -35,8 +35,8 @@ export class AuthService {
       .post<AuthResponse>(`${this.apiUrl}account/register`, data);
   }
 
-  getDetail = () : Observable<UserDetail> =>
-    this.http.get<UserDetail>(`${this.apiUrl}account/detail`); 
+  getDetail = (): Observable<UserDetail> =>
+    this.http.get<UserDetail>(`${this.apiUrl}account/detail`);
 
   getUserDetail = () => {
     const token = this.getToken();
@@ -70,6 +70,17 @@ export class AuthService {
   logout = (): void => {
     localStorage.removeItem(this.tokenKey);
   };
+
+  getRoles = (): string[] | null => {
+    const token = this.getToken();
+    if (!token) return null;
+
+    const decodedToken: any = jwtDecode(token);
+    return decodedToken.role || null;
+  }
+
+  getAll = (): Observable<UserDetail[]> =>
+    this.http.get<UserDetail[]>(`${this.apiUrl}account`);
 
   getToken = (): string | null =>
     localStorage.getItem(this.tokenKey) || '';
