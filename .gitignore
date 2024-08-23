@@ -2,6 +2,7 @@
 .vs/
 .vscode/*
 *.code-workspace
+*.csproj
 
 project.lock.json
 project.fragment.lock.json
