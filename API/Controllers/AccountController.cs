@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 using API.Dto;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using RestSharp;
 
 namespace API.Controllers
 {
@@ -107,6 +109,61 @@ namespace API.Controllers
             });
         }
 
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        public async Task<ActionResult> ForgotPassword(ForgotPasswordDto forgotPasswordDto)
+        {
+            var user = await _userManager.FindByEmailAsync(forgotPasswordDto.Email);
+
+            if (user is null)
+            {
+                return Ok(new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "User does not exist with email"
+                });
+            }
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var resetLink = $"http://localhost:4200/reset-password?email={user.Email}&tokan={WebUtility.UrlEncode(token)}";
+            var client = new RestClient("https://send.api.mailtrap.io/api/send");
+
+            var request = new RestRequest
+            {
+                Method = Method.Post,
+                RequestFormat = DataFormat.Json
+            };
+
+            request.AddHeader("Authorization", "Bearer aa3ddf48d69d57725b49d2df04f92f64");
+            request.AddJsonBody(new
+            {
+                from = new { email = "mailtrap@demomailtrap.com" },
+                to = new[] { new { email = user.Email } },
+                template_uuid = "1eda561f-9889-40c6-bc00-f5d1fc3ce044",
+                template_variables = new { user_email = user.Email, pass_reset_link = resetLink }
+            });
+
+            var response = client.Execute(request);
+
+            if (response.IsSuccessful)
+            {
+                return Ok(new AuthResponseDto
+                {
+                    IsSuccess = true,
+                    Message = "Email sent with password reset link. Please check your email."
+                });
+            }
+            else
+            {
+                return BadRequest(new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "Failed to send email."
+                });
+            }
+
+        }
+
         private string GenerateToken(AppUser user){
             var tokenHandler = new JwtSecurityTokenHandler();
 
@@ -116,7 +173,7 @@ namespace API.Controllers
 
             var roles = _userManager.GetRolesAsync(user).Result;
 
-            List<Claim> claims = 
+            List<Claim> claims =
             [
                 new (JwtRegisteredClaimNames.Email, user.Email ?? ""),
                 new (JwtRegisteredClaimNames.Name, user.FullName ?? ""),
@@ -177,7 +234,7 @@ namespace API.Controllers
             var users = await _userManager.Users.Select(u => new UserDetailDto{
                 Id = u.Id,
                 Email = u.Email,
-                FullName = u.FullName, 
+                FullName = u.FullName,
                 Roles = _userManager.GetRolesAsync(u).Result.ToArray()
             }).ToListAsync();
 
