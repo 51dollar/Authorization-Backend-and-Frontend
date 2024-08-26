@@ -35,7 +35,7 @@ namespace API.Controllers
         [HttpPost("register")]
         public async Task<ActionResult<string>> Register(RegisterDto registerDto)
         {
-            if(!ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
@@ -49,24 +49,25 @@ namespace API.Controllers
 
             var result = await _userManager.CreateAsync(user, registerDto.Password);
 
-            if(!result.Succeeded)
+            if (!result.Succeeded)
             {
                 return BadRequest(result.Errors);
             }
 
-            if(registerDto.Roles is null)
+            if (registerDto.Roles is null)
             {
                 await _userManager.AddToRoleAsync(user, "User");
             }
             else
             {
-                foreach(var role in registerDto.Roles)
+                foreach (var role in registerDto.Roles)
                 {
                     await _userManager.AddToRoleAsync(user, role);
                 }
             }
 
-            return Ok(new AuthResponseDto{
+            return Ok(new AuthResponseDto
+            {
                 IsSuccess = true,
                 Message = "Account Created Successfully!"
             });
@@ -76,16 +77,17 @@ namespace API.Controllers
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponseDto>> Login(LoginDto loginDto)
         {
-            if(!ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
             var user = await _userManager.FindByEmailAsync(loginDto.Email);
 
-            if(user is null)
+            if (user is null)
             {
-                return Unauthorized(new AuthResponseDto{
+                return Unauthorized(new AuthResponseDto
+                {
                     IsSuccess = false,
                     Message = "User not found with this email.",
                 });
@@ -93,8 +95,10 @@ namespace API.Controllers
 
             var result = await _userManager.CheckPasswordAsync(user, loginDto.Password);
 
-            if(!result){
-                return Unauthorized(new AuthResponseDto{
+            if (!result)
+            {
+                return Unauthorized(new AuthResponseDto
+                {
                     IsSuccess = false,
                     Message = "Invalid Password."
                 });
@@ -102,7 +106,8 @@ namespace API.Controllers
 
             var token = GenerateToken(user);
 
-            return Ok(new AuthResponseDto{
+            return Ok(new AuthResponseDto
+            {
                 Token = token,
                 IsSuccess = true,
                 Message = "Login Success."
@@ -125,7 +130,7 @@ namespace API.Controllers
             }
 
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var resetLink = $"http://localhost:4200/reset-password?email={user.Email}&tokan={WebUtility.UrlEncode(token)}";
+            var resetLink = $"http://localhost:4200/reset-password?email={user.Email}&token={WebUtility.UrlEncode(token)}";
             var client = new RestClient("https://send.api.mailtrap.io/api/send");
 
             var request = new RestRequest
@@ -164,7 +169,42 @@ namespace API.Controllers
 
         }
 
-        private string GenerateToken(AppUser user){
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordDto resetPasswordDto)
+        {
+            var user = await _userManager.FindByEmailAsync(resetPasswordDto.Email);
+            //resetPasswordDto.Token = WebUtility.UrlDecode(resetPasswordDto.Token);
+
+            if (user is null)
+            {
+                return BadRequest(new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "User does not exist with this email"
+                });
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, resetPasswordDto.Token, resetPasswordDto.NewPassword);
+
+            if (result.Succeeded)
+            {
+                return Ok(new AuthResponseDto
+                {
+                    IsSuccess = true,
+                    Message = "Password reset Successfully"
+                });
+            }
+
+            return BadRequest(new AuthResponseDto
+            {
+                IsSuccess = false,
+                Message = result.Errors.FirstOrDefault()!.Description
+            });
+        }
+
+        private string GenerateToken(AppUser user)
+        {
             var tokenHandler = new JwtSecurityTokenHandler();
 
             var key = Encoding.ASCII
@@ -182,7 +222,7 @@ namespace API.Controllers
                 new (JwtRegisteredClaimNames.Iss, _configuration.GetSection("JWTSetting").GetSection("validIssuer").Value!)
             ];
 
-            foreach(var role in roles)
+            foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
             }
@@ -209,19 +249,21 @@ namespace API.Controllers
             var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = await _userManager.FindByIdAsync(currentUserId!);
 
-            if(user is null)
+            if (user is null)
             {
-                return NotFound(new AuthResponseDto{
+                return NotFound(new AuthResponseDto
+                {
                     IsSuccess = false,
                     Message = "User not found"
                 });
             }
 
-            return Ok(new UserDetailDto{
+            return Ok(new UserDetailDto
+            {
                 Id = user.Id,
                 Email = user.Email,
                 FullName = user.FullName,
-                Roles = [..await _userManager.GetRolesAsync(user)],
+                Roles = [.. await _userManager.GetRolesAsync(user)],
                 PhoneNumber = user.PhoneNumber,
                 PhoneNumberConfirmed = user.PhoneNumberConfirmed,
                 AccessFailedCount = user.AccessFailedCount,
@@ -231,7 +273,8 @@ namespace API.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UserDetailDto>>> GetUsers()
         {
-            var users = await _userManager.Users.Select(u => new UserDetailDto{
+            var users = await _userManager.Users.Select(u => new UserDetailDto
+            {
                 Id = u.Id,
                 Email = u.Email,
                 FullName = u.FullName,
